@@ -8,12 +8,6 @@ class StringDiff:
     def __init__(self, tag_string, rec_string):
         self._srcString = self._space_chinese_word(tag_string)   # 标注文本
         self._recString = self._space_chinese_word(rec_string)   # 识别文本
-        self.addCount = 0
-        self.subCount = 0
-        self.errCount = 0
-        self.allCount = 0
-        self.sameCount = 0
-        self.wer = 0.0
         self.result = {
             "allCount": None,
             "addCount": None,
@@ -21,6 +15,7 @@ class StringDiff:
             "errCount": None,
             "sameCount": None,
             "wer": None,
+            "diffString": None,
             "errMsg": None
         }
 
@@ -48,9 +43,7 @@ class StringDiff:
     def lcsc(self, seqx, seqy):
         lenx = len(seqx)
         leny = len(seqy)
-        print("lenx", lenx,"leny",leny)
         table = [[[] for x in range(leny  + 1)] for y in range(lenx + 1)]
-        print(table)
         Matrix = [[0 for x in range(leny + 1)]for y in range(lenx + 1)]
         for tmp in range(0, lenx + 1):
             Matrix[tmp][0] = tmp
@@ -74,8 +67,7 @@ class StringDiff:
                     MinCost = ReplaceCost + Matrix[xline - 1][yline - 1]
                     table[xline][yline].extend(table[xline - 1][yline - 1])
                     if ReplaceCost == 0:
-                        print(table[xline][yline])
-                        table[xline][yline].append([xline - 1][yline - 1])
+                        table[xline][yline].append([xline - 1, yline - 1])
                 elif MinCost2 == MinCost1:
                     if len(table[xline][yline - 1]) >= len(table[xline - 1][yline]):
                         table[xline][yline] = table[xline][yline - 1]
@@ -102,21 +94,74 @@ class StringDiff:
         if len(dstparts) <=0 :
             self.result["errMsg"] = "没有识别文本"
             return self.result
-        print("srcparts:", srcparts)
-        print("dstparts:", dstparts)
+
         lcsparts = self.lcsc(srcparts, dstparts)
-        # print(lcsparts)
+        if len(lcsparts) == 0:
+            self.result["errMsg"] = "计算异常"
+            return self.result
 
+        allcount = len(srcparts)
+        samecount = 0
+        diffparts = []
+        addcount = 0
+        subcount = 0
+        errcount = 0
+        srcindex = 0
+        dstindex = 0
+        lcsindex = 0
 
+        while lcsindex < len(lcsparts):
+            src = lcsparts[lcsindex][0]
+            dst = lcsparts[lcsindex][1]
+            while srcindex < src and dstindex < dst:
+                diffparts.append('(')
+                diffparts.append(srcparts[srcindex])
+                diffparts.append(':')
+                diffparts.append(dstparts[dstindex])
+                diffparts.append(')')
 
+                errcount += 1
+                srcindex += 1
+                dstindex += 1
 
+            if srcindex < src:
+                diffparts.append('[')
+                while srcindex < src:
+                    diffparts.append(srcparts[srcindex])
 
+                    subcount += 1
+                    srcindex += 1
+                diffparts.append(']')
 
+            if dstindex < dst:
+                diffparts.append('<')
+                while dstindex < dst:
+                    diffparts.append(dstparts[dstindex])
 
+                    addcount += 1
+                    dstindex += 1
+                diffparts.append('>')
+
+            if lcsindex != len(lcsparts) - 1:
+                diffparts.append(dstparts[dstindex])
+                samecount += 1
+                srcindex += 1
+                dstindex += 1
+            lcsindex += 1
+
+        self.result["allCount"] = len(srcparts)
+        self.result["addCount"] = addcount
+        self.result["subCount"] = subcount
+        self.result["errCount"] = errcount
+        self.result["sameCount"] = samecount
+        self.result["wer"] = (addcount + subcount + errcount) / allcount
+        self.result["diffString"] = "".join(diffparts)
+        return self.result
 
 
 if __name__ == "__main__":
-    a = "我是"
-    b = "我是"
+    a = "我们都是中国人"
+    b = "我们都中国人"
     c = StringDiff(a, b)
-    c.calclate_diff_lcs2()
+    t = c.calclate_diff_lcs2()
+    print(t)
